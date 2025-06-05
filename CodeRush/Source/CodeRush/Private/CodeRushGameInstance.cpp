@@ -5,13 +5,15 @@
 #include "Json.h"
 #include "JsonUtilities.h"
 
-void UCodeRushGameInstance::Init() {
+void UCodeRushGameInstance::Init()
+{
 	Super::Init();
 
 	UE_LOG(LogTemp, Log, TEXT("CodeRush GameInstance Init"));
 }
 
-void UCodeRushGameInstance::CreateUser(const FString& Nickname) {
+void UCodeRushGameInstance::CreateUser(const FString& Nickname)
+{
 	TSharedRef<FJsonObject> RequestBody = MakeShared<FJsonObject>();
 	RequestBody->SetStringField("nickname", Nickname);
 
@@ -27,7 +29,8 @@ void UCodeRushGameInstance::CreateUser(const FString& Nickname) {
 	Request->ProcessRequest();
 }
 
-void UCodeRushGameInstance::OnCreateUserResponse(FHttpRequestPtr Request, FHttpResponsePtr Response, bool bWasSuccessful) {
+void UCodeRushGameInstance::OnCreateUserResponse(FHttpRequestPtr Request, FHttpResponsePtr Response, bool bWasSuccessful)
+{
 	if (!bWasSuccessful || !Response.IsValid())
 	{
 		UE_LOG(LogTemp, Error, TEXT("[CreateUser] Http request failed"));
@@ -47,7 +50,8 @@ void UCodeRushGameInstance::OnCreateUserResponse(FHttpRequestPtr Request, FHttpR
 	}
 }
 
-void UCodeRushGameInstance::GetProblemSet() {
+void UCodeRushGameInstance::GetProblemSet()
+{
 	TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = FHttpModule::Get().CreateRequest();
 	Request->SetURL("http://localhost:8080/api/problems/set");
 	Request->SetVerb("GET");
@@ -56,7 +60,8 @@ void UCodeRushGameInstance::GetProblemSet() {
 	Request->ProcessRequest();
 }
 
-void UCodeRushGameInstance::OnGetProblemSetResponse(FHttpRequestPtr Request, FHttpResponsePtr Response, bool bWasSuccessful) {
+void UCodeRushGameInstance::OnGetProblemSetResponse(FHttpRequestPtr Request, FHttpResponsePtr Response, bool bWasSuccessful)
+{
 	if (!bWasSuccessful || !Response.IsValid())
 	{
 		UE_LOG(LogTemp, Error, TEXT("[GetProblemSet] HTTP request failed"));
@@ -66,9 +71,11 @@ void UCodeRushGameInstance::OnGetProblemSetResponse(FHttpRequestPtr Request, FHt
 	TArray<TSharedPtr<FJsonValue>> JsonArray;
 	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Response->GetContentAsString());
 
-	if (FJsonSerializer::Deserialize(Reader, JsonArray)) {
+	if (FJsonSerializer::Deserialize(Reader, JsonArray))
+	{
 		ProblemSet.Empty();
-		for (TSharedPtr<FJsonValue> Value : JsonArray) {
+		for (TSharedPtr<FJsonValue> Value : JsonArray)
+		{
 			TSharedPtr<FJsonObject> Obj = Value->AsObject();
 			FProblemDTO Problem;
 			Problem.type = Obj->GetStringField("type");
@@ -79,8 +86,10 @@ void UCodeRushGameInstance::OnGetProblemSetResponse(FHttpRequestPtr Request, FHt
 			Problem.correctFix = Obj->GetStringField("correctFix");
 
 			const TArray<TSharedPtr<FJsonValue>>* ChoicesArray;
-			if (Obj->TryGetArrayField("choices", ChoicesArray)) {
-				for (auto ChoiceValue : *ChoicesArray) {
+			if (Obj->TryGetArrayField("choices", ChoicesArray))
+			{
+				for (auto ChoiceValue : *ChoicesArray)
+				{
 					Problem.choices.Add(ChoiceValue->AsString());
 				}
 			}
