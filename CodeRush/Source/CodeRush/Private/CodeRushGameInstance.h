@@ -8,8 +8,14 @@
 #include "CodeRushGameInstance.generated.h"
 
 USTRUCT(BlueprintType)
-struct FProblemDTO {
+struct CODERUSH_API FProblemDTO {
 	GENERATED_BODY()
+
+	UPROPERTY(BlueprintReadWrite)
+	int32 id;
+
+	UPROPERTY(BlueprintReadWrite)
+	FString category;
 
 	UPROPERTY(BlueprintReadWrite)
 	FString type;
@@ -33,11 +39,13 @@ struct FProblemDTO {
 	TArray<FString> choices;
 };
 
+DECLARE_DYNAMIC_MULTICAST_DELEGATE(FProblemSetLoadedDelegate);
+
 /**
  * 
  */
 UCLASS()
-class UCodeRushGameInstance : public UGameInstance{
+class CODERUSH_API UCodeRushGameInstance : public UGameInstance{
 	GENERATED_BODY()
 
 public:
@@ -49,13 +57,26 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void GetProblemSet();
 
+	UFUNCTION(BlueprintCallable)
+	void SubmitSubjectiveAnswer(int32 ProblemId, const FString& WrittenAnswer, const FString& Category);
+
+	UFUNCTION(BlueprintCallable)
+	void SubmitObjectiveAnswer(int32 ProblemId, const FString& SelectedChoice, const FString& Category, const FString& TargetSnippet, const FString& FixAttempt);
+
 	UPROPERTY(BlueprintReadWrite)
 	int32 CurrentUserId;
 
 	UPROPERTY(BlueprintReadWrite)
 	TArray<FProblemDTO> ProblemSet;
 
+	UPROPERTY(BlueprintReadWrite)
+	int32 CurrentProblemIndex;
+
+	UPROPERTY(BlueprintAssignable)
+	FProblemSetLoadedDelegate OnProblemSetLoaded;
+
 private:
 	void OnCreateUserResponse(FHttpRequestPtr Request, FHttpResponsePtr Response, bool bSuccess);
 	void OnGetProblemSetResponse(FHttpRequestPtr Request, FHttpResponsePtr Response, bool bSuccess);
+	void OnSubmitAnswerResponse(FHttpRequestPtr Request, FHttpResponsePtr Response, bool bWasSuccessful);
 };
