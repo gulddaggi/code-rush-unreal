@@ -112,6 +112,8 @@ void UCodeRushGameInstance::SubmitSubjectiveAnswer(int32 ProblemId, const FStrin
 		CurrentUserId
 	);
 
+	UE_LOG(LogTemp, Log, TEXT("[Submit] Endpoint: %s, ProblemId: %d"), *Endpoint, ProblemId);
+
 	TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = FHttpModule::Get().CreateRequest();
 	Request->SetURL(Endpoint);
 	Request->SetVerb("POST");
@@ -144,6 +146,8 @@ void UCodeRushGameInstance::OnGetProblemSetResponse(FHttpRequestPtr Request, FHt
 	TArray<TSharedPtr<FJsonValue>> JsonArray;
 	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Response->GetContentAsString());
 
+	UE_LOG(LogTemp, Log, TEXT("[GetProblemSet] Raw Response:\n%s"), *Response->GetContentAsString());
+
 	if (FJsonSerializer::Deserialize(Reader, JsonArray))
 	{
 		ProblemSet.Empty();
@@ -153,9 +157,21 @@ void UCodeRushGameInstance::OnGetProblemSetResponse(FHttpRequestPtr Request, FHt
 			FProblemDTO Problem;
 			// id (Null-safe Ã³¸®)
 			int32 TmpId;
-			if (Obj->TryGetNumberField("id", TmpId))
+			if (Obj->HasField("id"))
 			{
-				Problem.id = TmpId;
+				FString IdString;
+				if (Obj->TryGetStringField("id", IdString))
+				{
+					Problem.id = FCString::Atoi(*IdString);
+				}
+				else if (Obj->TryGetNumberField("id", TmpId))
+				{
+					Problem.id = TmpId;
+				}
+				else
+				{
+					Problem.id = -1;
+				}
 			}
 			else
 			{
