@@ -58,7 +58,7 @@ public:
 	void GetProblemSet();
 
 	UFUNCTION(BlueprintCallable)
-	void SubmitSubjectiveAnswer(int32 ProblemId, const FString& WrittenAnswer, const FString& Category);
+	void SubmitSubjectiveAnswer(int32 ProblemId, const FString& WrittenAnswer, const FString& Category, const FString& TargetSnippet);
 
 	UFUNCTION(BlueprintCallable)
 	void SubmitObjectiveAnswer(int32 ProblemId, const FString& SelectedChoice, const FString& Category, const FString& TargetSnippet, const FString& FixAttempt);

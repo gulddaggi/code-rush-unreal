@@ -95,11 +95,12 @@ void UCodeRushGameInstance::SubmitObjectiveAnswer(int32 ProblemId, const FString
 	Request->ProcessRequest();
 }
 
-void UCodeRushGameInstance::SubmitSubjectiveAnswer(int32 ProblemId, const FString& WrittenAnswer, const FString& Category)
+void UCodeRushGameInstance::SubmitSubjectiveAnswer(int32 ProblemId, const FString& WrittenAnswer, const FString& Category, const FString& TargetSnippet)
 {
 	TSharedRef<FJsonObject> RequestBody = MakeShared<FJsonObject>();
 	RequestBody->SetNumberField("problemId", ProblemId);
 	RequestBody->SetStringField("writtenAnswer", WrittenAnswer);
+	RequestBody->SetStringField("targetSnippet", TargetSnippet);
 	RequestBody->SetStringField("selectedChoice", TEXT("")); // API 요구상 항상 포함
 
 	FString OutputString;
@@ -112,7 +113,7 @@ void UCodeRushGameInstance::SubmitSubjectiveAnswer(int32 ProblemId, const FStrin
 		CurrentUserId
 	);
 
-	UE_LOG(LogTemp, Log, TEXT("[Submit] Endpoint: %s, ProblemId: %d"), *Endpoint, ProblemId);
+	UE_LOG(LogTemp, Log, TEXT("[Submit] Endpoint: %s, ProblemId: %d, TargetSnippet: %s"), *Endpoint, ProblemId, *TargetSnippet);
 
 	TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = FHttpModule::Get().CreateRequest();
 	Request->SetURL(Endpoint);
@@ -180,8 +181,22 @@ void UCodeRushGameInstance::OnGetProblemSetResponse(FHttpRequestPtr Request, FHt
 			Problem.category = Obj->GetStringField("category");
 			Problem.type = Obj->GetStringField("type");
 			Problem.title = Obj->GetStringField("title");
-			Problem.description = Obj->GetStringField("description");
 			Problem.answer = Obj->GetStringField("answer");
+
+			FString FullDescription = Obj->GetStringField("description");
+
+			FString DescPart, CodePart;
+			if (FullDescription.Split(TEXT("코드:\n"), &DescPart, &CodePart))
+			{
+				Problem.description = DescPart.TrimStartAndEnd();
+
+				Problem.targetSnippet = CodePart.TrimStartAndEnd();
+			}
+			else
+			{
+				Problem.description = FullDescription;
+				Problem.targetSnippet = TEXT("");
+			}
 
 			// Null-safe 파싱
 			FString TmpString;
