@@ -1,4 +1,4 @@
-// Fill out your copyright notice in the Description page of Project Settings.
+﻿// Fill out your copyright notice in the Description page of Project Settings.
 
 
 #include "CodeRushGameInstance.h"
@@ -99,9 +99,9 @@ void UCodeRushGameInstance::SubmitSubjectiveAnswer(int32 ProblemId, const FStrin
 {
 	TSharedRef<FJsonObject> RequestBody = MakeShared<FJsonObject>();
 	RequestBody->SetNumberField("problemId", ProblemId);
-	RequestBody->SetStringField("writtenAnswer", WrittenAnswer);
+	RequestBody->SetStringField("fixAttempt", WrittenAnswer);
 	RequestBody->SetStringField("targetSnippet", TargetSnippet);
-	RequestBody->SetStringField("selectedChoice", TEXT("")); // API �䱸�� �׻� ����
+	RequestBody->SetStringField("selectedChoice", TEXT("")); // API 요구상 항상 포함
 
 	FString OutputString;
 	TSharedRef<TJsonWriter<>> Writer = TJsonWriterFactory<>::Create(&OutputString);
@@ -114,6 +114,8 @@ void UCodeRushGameInstance::SubmitSubjectiveAnswer(int32 ProblemId, const FStrin
 	);
 
 	UE_LOG(LogTemp, Log, TEXT("[Submit] Endpoint: %s, ProblemId: %d, TargetSnippet: %s"), *Endpoint, ProblemId, *TargetSnippet);
+	UE_LOG(LogTemp, Warning, TEXT("[Submit] TargetSnippet:\n%s"), *TargetSnippet);
+	UE_LOG(LogTemp, Warning, TEXT("[Submit] WrittenAnswer:\n%s"), *WrittenAnswer);
 
 	TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = FHttpModule::Get().CreateRequest();
 	Request->SetURL(Endpoint);
@@ -128,7 +130,21 @@ void UCodeRushGameInstance::OnSubmitAnswerResponse(FHttpRequestPtr Request, FHtt
 {
 	if (bWasSuccessful && Response.IsValid())
 	{
-		UE_LOG(LogTemp, Log, TEXT("[SubmitAnswer] Success: %s"), *Response->GetContentAsString());
+		FString ResponseStr = Response->GetContentAsString();
+		UE_LOG(LogTemp, Log, TEXT("[SubmitAnswer] Success: %s"), *ResponseStr);
+
+		bool bIsCorrect = ResponseStr.Equals(TEXT("true"), ESearchCase::IgnoreCase);
+
+		if (bIsCorrect)
+		{
+			UE_LOG(LogTemp, Log, TEXT("[SubmitAnswer] Correct ✅"));
+		}
+		else
+		{
+			UE_LOG(LogTemp, Warning, TEXT("[SubmitAnswer] Incorrect ❌"));
+		}
+
+		OnAnswerResultReceived.Broadcast(bIsCorrect);
 	}
 	else
 	{
@@ -156,7 +172,8 @@ void UCodeRushGameInstance::OnGetProblemSetResponse(FHttpRequestPtr Request, FHt
 		{
 			TSharedPtr<FJsonObject> Obj = Value->AsObject();
 			FProblemDTO Problem;
-			// id (Null-safe ó��)
+
+			// id (Null-safe 처리)
 			int32 TmpId;
 			if (Obj->HasField("id"))
 			{
@@ -178,37 +195,35 @@ void UCodeRushGameInstance::OnGetProblemSetResponse(FHttpRequestPtr Request, FHt
 			{
 				Problem.id = -1;
 			}
+
 			Problem.category = Obj->GetStringField("category");
 			Problem.type = Obj->GetStringField("type");
 			Problem.title = Obj->GetStringField("title");
 			Problem.answer = Obj->GetStringField("answer");
 
 			FString FullDescription = Obj->GetStringField("description");
+			Problem.description = FullDescription; // 우선 전체 저장
 
 			FString DescPart, CodePart;
-			if (FullDescription.Split(TEXT("�ڵ�:\n"), &DescPart, &CodePart))
+			if (FullDescription.Split(TEXT("코드:"), &DescPart, &CodePart))
 			{
 				Problem.description = DescPart.TrimStartAndEnd();
-
-				Problem.targetSnippet = CodePart.TrimStartAndEnd();
-			}
-			else
-			{
-				Problem.description = FullDescription;
-				Problem.targetSnippet = TEXT("");
+				CodePart.TrimStartInline();
+				Problem.targetSnippet = CodePart; // 기본적으로 description에 있는 코드 사용
 			}
 
-			// Null-safe �Ľ�
+
+			// JSON 필드 기반 targetSnippet이 존재할 경우만 덮어쓰기
 			FString TmpString;
-			if (Obj->TryGetStringField("targetSnippet", TmpString))
+			if (Problem.targetSnippet.IsEmpty())
 			{
-				Problem.targetSnippet = TmpString;
-			}
-			else
-			{
-				Problem.targetSnippet = TEXT("");
+				if (Obj->TryGetStringField("targetSnippet", TmpString))
+				{
+					Problem.targetSnippet = TmpString;
+				}
 			}
 
+			// correctFix
 			if (Obj->TryGetStringField("correctFix", TmpString))
 			{
 				Problem.correctFix = TmpString;
@@ -218,7 +233,7 @@ void UCodeRushGameInstance::OnGetProblemSetResponse(FHttpRequestPtr Request, FHt
 				Problem.correctFix = TEXT("");
 			}
 
-			// Choices �Ľ�
+			// Choices 파싱
 			Problem.choices.Empty();
 			const TArray<TSharedPtr<FJsonValue>>* ChoicesArray;
 			if (Obj->TryGetArrayField("choices", ChoicesArray))
@@ -231,10 +246,9 @@ void UCodeRushGameInstance::OnGetProblemSetResponse(FHttpRequestPtr Request, FHt
 
 			ProblemSet.Add(Problem);
 		}
+
 		UE_LOG(LogTemp, Log, TEXT("[GetProblemSet] Loaded %d problems"), ProblemSet.Num());
-
 		CurrentProblemIndex = 0;
-
 		OnProblemSetLoaded.Broadcast();
 	}
 	else

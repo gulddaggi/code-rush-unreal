@@ -40,6 +40,7 @@ struct CODERUSH_API FProblemDTO {
 };
 
 DECLARE_DYNAMIC_MULTICAST_DELEGATE(FProblemSetLoadedDelegate);
+DECLARE_DYNAMIC_MULTICAST_DELEGATE_OneParam(FOnAnswerResultReceived, bool, bIsCorrect);
 
 /**
  * 
@@ -74,6 +75,9 @@ public:
 
 	UPROPERTY(BlueprintAssignable)
 	FProblemSetLoadedDelegate OnProblemSetLoaded;
+
+	UPROPERTY(BlueprintAssignable)
+	FOnAnswerResultReceived OnAnswerResultReceived;
 
 private:
 	void OnCreateUserResponse(FHttpRequestPtr Request, FHttpResponsePtr Response, bool bSuccess);
