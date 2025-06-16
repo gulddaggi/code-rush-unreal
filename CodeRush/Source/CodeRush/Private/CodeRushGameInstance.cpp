@@ -256,3 +256,19 @@ void UCodeRushGameInstance::OnGetProblemSetResponse(FHttpRequestPtr Request, FHt
 		UE_LOG(LogTemp, Error, TEXT("[GetProblemSet] Failed to parse JSON array"));
 	}
 }
+
+void UCodeRushGameInstance::GoToNextProblem()
+{
+	if (CurrentProblemIndex + 1 < ProblemSet.Num())
+	{
+		CurrentProblemIndex++;
+		UE_LOG(LogTemp, Log, TEXT("[NextProblem] Moving to Problem #%d"), CurrentProblemIndex);
+
+		OnProblemChanged.Broadcast(ProblemSet[CurrentProblemIndex]);
+	}
+	else
+	{
+		UE_LOG(LogTemp, Warning, TEXT("[NextProblem] No more problems left."));
+	}
+
+}
