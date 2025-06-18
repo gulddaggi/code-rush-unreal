@@ -46,7 +46,11 @@ void UCodeRushGameInstance::OnCreateUserResponse(FHttpRequestPtr Request, FHttpR
 		CurrentUserId = JsonObject->GetIntegerField("id");
 		UE_LOG(LogTemp, Log, TEXT("[CreateUser] User created with ID: %d"), CurrentUserId);
 
-		GetProblemSet();
+		FTimerHandle TempHandle;
+		GetWorld()->GetTimerManager().SetTimer(TempHandle, [this]()
+			{
+				GetProblemSet();
+			}, 1.0f, false);
 	}
 	else
 	{
@@ -59,9 +63,16 @@ void UCodeRushGameInstance::GetProblemSet()
 	TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = FHttpModule::Get().CreateRequest();
 	Request->SetURL("http://localhost:8080/api/problems/set");
 	Request->SetVerb("GET");
+	Request->SetTimeout(60.0f);
 	Request->SetHeader("Content-Type", "application/json");
 	Request->OnProcessRequestComplete().BindUObject(this, &UCodeRushGameInstance::OnGetProblemSetResponse);
-	Request->ProcessRequest();
+	bool bDispatched = Request->ProcessRequest();
+	UE_LOG(LogTemp, Warning, TEXT("[HTTP] Sending GET to: %s"), *Request->GetURL());
+
+	if (!bDispatched)
+	{
+		UE_LOG(LogTemp, Error, TEXT("[HTTP] ProcessRequest failed to dispatch request"));
+	}
 }
 
 void UCodeRushGameInstance::SubmitObjectiveAnswer(int32 ProblemId, const FString& SelectedChoice, const FString& Category, const FString& TargetSnippet, const FString& FixAttempt)
@@ -154,11 +165,28 @@ void UCodeRushGameInstance::OnSubmitAnswerResponse(FHttpRequestPtr Request, FHtt
 
 void UCodeRushGameInstance::OnGetProblemSetResponse(FHttpRequestPtr Request, FHttpResponsePtr Response, bool bWasSuccessful)
 {
+
 	if (!bWasSuccessful || !Response.IsValid())
 	{
-		UE_LOG(LogTemp, Error, TEXT("[GetProblemSet] HTTP request failed"));
+		if (!bWasSuccessful)
+		{
+			UE_LOG(LogTemp, Error, TEXT("[GetProblemSet] Request failed to send"));
+		}
+		else if (!Response.IsValid())
+		{
+			UE_LOG(LogTemp, Error, TEXT("[GetProblemSet] Response invalid"));
+		}
+
 		return;
 	}
+
+	FString ContentType = Response->GetHeader("Content-Type");
+	UE_LOG(LogTemp, Warning, TEXT("[GetProblemSet] Response Content-Type: %s"), *ContentType);
+
+	int32 StatusCode = Response->GetResponseCode();
+	UE_LOG(LogTemp, Warning, TEXT("[GetProblemSet] HTTP Response Code: %d"), StatusCode);
+
+	UE_LOG(LogTemp, Warning, TEXT("Response code: %d"), Response->GetResponseCode());
 
 	TArray<TSharedPtr<FJsonValue>> JsonArray;
 	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Response->GetContentAsString());
