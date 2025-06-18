@@ -7,6 +7,16 @@
 #include "Http.h"
 #include "CodeRushGameInstance.generated.h"
 
+UENUM(BlueprintType)
+enum class EGamePhase : uint8
+{
+	Title       UMETA(DisplayName = "Title"),
+	Lobby       UMETA(DisplayName = "Lobby"),
+	Loading     UMETA(DisplayName = "Loading"),
+	InGame      UMETA(DisplayName = "InGame"),
+	Result      UMETA(DisplayName = "Result")
+};
+
 USTRUCT(BlueprintType)
 struct CODERUSH_API FProblemDTO {
 	GENERATED_BODY()
@@ -74,6 +84,9 @@ public:
 	UPROPERTY(BlueprintReadWrite)
 	int32 CurrentProblemIndex;
 
+	UPROPERTY(BluepringReadWrite)
+	EGamePhase CurrentPhase;
+
 	UPROPERTY(BlueprintAssignable)
 	FProblemSetLoadedDelegate OnProblemSetLoaded;
 
@@ -85,6 +98,9 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	void GoToNextProblem();
+
+	UFUNCTION(BlueprintCallable)
+	void SetGamePhase(EGamePhase NewPhase);
 
 private:
 	void OnCreateUserResponse(FHttpRequestPtr Request, FHttpResponsePtr Response, bool bSuccess);

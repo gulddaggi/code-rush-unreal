@@ -300,3 +300,26 @@ void UCodeRushGameInstance::GoToNextProblem()
 	}
 
 }
+
+void UCodeRushGameInstance::SetGamePhase(EGamePhase NewPhase)
+{
+	CurrentPhase = NewPhase;
+
+	switch (CurrentPhase)
+	{
+		case EGamePhase::Title:
+			UE_LOG(LogTemp, Warning, TEXT("Title Phase"));
+			break;
+
+		case EGamePhase::Lobby:
+			UE_LOG(LogTemp, Warning, TEXT("Lobby Phase"));
+			break;
+
+		case EGamePhase::InGame:
+			UE_LOG(LogTemp, Warning, TEXT("InGame Phase"));
+			break;
+
+		default:
+			break;
+	}
+}
