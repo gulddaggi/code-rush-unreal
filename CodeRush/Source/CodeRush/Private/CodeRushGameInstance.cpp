@@ -4,6 +4,7 @@
 #include "CodeRushGameInstance.h"
 #include "Json.h"
 #include "JsonUtilities.h"
+#include "Blueprint/UserWidget.h"
 
 void UCodeRushGameInstance::Init()
 {
@@ -305,21 +306,42 @@ void UCodeRushGameInstance::SetGamePhase(EGamePhase NewPhase)
 {
 	CurrentPhase = NewPhase;
 
-	switch (CurrentPhase)
+	// 기존 위젯 제거
+	if (CurrentWidget)
+	{
+		CurrentWidget->RemoveFromParent();
+		CurrentWidget = nullptr;
+	}
+
+	FString WidgetPath;
+	switch (NewPhase)
 	{
 		case EGamePhase::Title:
-			UE_LOG(LogTemp, Warning, TEXT("Title Phase"));
+			WidgetPath = TEXT("/Game/UI/WBP_TitleScreen.WBP_TitleScreen_C");
 			break;
-
 		case EGamePhase::Lobby:
-			UE_LOG(LogTemp, Warning, TEXT("Lobby Phase"));
+			WidgetPath = TEXT("/Game/UI/WBP_LobbyScreen.WBP_LobbyScreen_C");
 			break;
-
+		case EGamePhase::Loading:
+			WidgetPath = TEXT("/Game/UI/WBP_LoadingScreen.WBP_LoadingScreen_C");
+			break;
 		case EGamePhase::InGame:
-			UE_LOG(LogTemp, Warning, TEXT("InGame Phase"));
+			WidgetPath = TEXT("/Game/UI/WBP_ProblemScreen.WBP_ProblemScreen_C");
 			break;
-
+		case EGamePhase::Result:
+			WidgetPath = TEXT("/Game/UI/WBP_ResultScreen.WBP_ResultScreen_C");
+			break;
 		default:
-			break;
+			return;
+	}
+
+	TSubclassOf<UUserWidget> WidgetClass = LoadClass<UUserWidget>(nullptr, *WidgetPath);
+	if (WidgetClass)
+	{
+		CurrentWidget = CreateWidget<UUserWidget>(GetWorld(), WidgetClass);
+		if (CurrentWidget)
+		{
+			CurrentWidget->AddToViewport();
+		}
 	}
 }

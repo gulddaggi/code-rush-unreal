@@ -84,8 +84,8 @@ public:
 	UPROPERTY(BlueprintReadWrite)
 	int32 CurrentProblemIndex;
 
-	UPROPERTY(BluepringReadWrite)
-	EGamePhase CurrentPhase;
+	UPROPERTY(BlueprintReadWrite)
+	EGamePhase CurrentPhase = EGamePhase::Title;
 
 	UPROPERTY(BlueprintAssignable)
 	FProblemSetLoadedDelegate OnProblemSetLoaded;
@@ -98,6 +98,9 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	void GoToNextProblem();
+
+	UPROPERTY()
+	UUserWidget* CurrentWidget = nullptr;
 
 	UFUNCTION(BlueprintCallable)
 	void SetGamePhase(EGamePhase NewPhase);
