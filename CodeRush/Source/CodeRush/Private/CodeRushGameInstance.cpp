@@ -298,6 +298,7 @@ void UCodeRushGameInstance::GoToNextProblem()
 	else
 	{
 		UE_LOG(LogTemp, Warning, TEXT("[NextProblem] No more problems left."));
+		SetGamePhase(EGamePhase::Result);
 	}
 
 }
