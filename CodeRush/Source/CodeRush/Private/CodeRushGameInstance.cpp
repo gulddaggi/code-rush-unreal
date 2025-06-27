@@ -46,12 +46,6 @@ void UCodeRushGameInstance::OnCreateUserResponse(FHttpRequestPtr Request, FHttpR
 	{
 		CurrentUserId = JsonObject->GetIntegerField("id");
 		UE_LOG(LogTemp, Log, TEXT("[CreateUser] User created with ID: %d"), CurrentUserId);
-
-		FTimerHandle TempHandle;
-		GetWorld()->GetTimerManager().SetTimer(TempHandle, [this]()
-			{
-				GetProblemSet();
-			}, 1.0f, false);
 	}
 	else
 	{
@@ -64,7 +58,7 @@ void UCodeRushGameInstance::GetProblemSet()
 	TSharedRef<IHttpRequest, ESPMode::ThreadSafe> Request = FHttpModule::Get().CreateRequest();
 	Request->SetURL("http://localhost:8080/api/problems/set");
 	Request->SetVerb("GET");
-	Request->SetTimeout(60.0f);
+	Request->SetTimeout(300.0f);
 	Request->SetHeader("Content-Type", "application/json");
 	Request->OnProcessRequestComplete().BindUObject(this, &UCodeRushGameInstance::OnGetProblemSetResponse);
 	bool bDispatched = Request->ProcessRequest();
@@ -150,10 +144,12 @@ void UCodeRushGameInstance::OnSubmitAnswerResponse(FHttpRequestPtr Request, FHtt
 		if (bIsCorrect)
 		{
 			UE_LOG(LogTemp, Log, TEXT("[SubmitAnswer] Correct ✅"));
+			CorrectAnswerCount++;
 		}
 		else
 		{
 			UE_LOG(LogTemp, Warning, TEXT("[SubmitAnswer] Incorrect ❌"));
+			IncorrectProblems.Add(ProblemSet[CurrentProblemIndex]);
 		}
 
 		OnAnswerResultReceived.Broadcast(bIsCorrect);
@@ -345,4 +341,12 @@ void UCodeRushGameInstance::SetGamePhase(EGamePhase NewPhase)
 			CurrentWidget->AddToViewport();
 		}
 	}
+}
+
+void UCodeRushGameInstance::ResetGameState()
+{
+	CurrentProblemIndex = 0;
+	CorrectAnswerCount = 0;
+	ProblemSet.Empty();
+	IncorrectProblems.Empty();
 }

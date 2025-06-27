@@ -82,6 +82,9 @@ public:
 	TArray<FProblemDTO> ProblemSet;
 
 	UPROPERTY(BlueprintReadWrite)
+	TArray<FProblemDTO> IncorrectProblems;
+
+	UPROPERTY(BlueprintReadWrite)
 	int32 CurrentProblemIndex;
 
 	UPROPERTY(BlueprintReadWrite)
@@ -104,6 +107,12 @@ public:
 
 	UFUNCTION(BlueprintCallable)
 	void SetGamePhase(EGamePhase NewPhase);
+
+	UPROPERTY(BlueprintReadWrite)
+	int32 CorrectAnswerCount = 0;
+
+	UFUNCTION(BlueprintCallable)
+	void ResetGameState();
 
 private:
 	void OnCreateUserResponse(FHttpRequestPtr Request, FHttpResponsePtr Response, bool bSuccess);
