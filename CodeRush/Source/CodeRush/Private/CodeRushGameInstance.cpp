@@ -11,7 +11,6 @@ void UCodeRushGameInstance::Init()
 	Super::Init();
 
 	UE_LOG(LogTemp, Log, TEXT("CodeRush GameInstance Init"));
-	CurrentProblemIndex = 0;
 }
 
 void UCodeRushGameInstance::CreateUser(const FString& Nickname)
@@ -160,110 +159,105 @@ void UCodeRushGameInstance::OnSubmitAnswerResponse(FHttpRequestPtr Request, FHtt
 	}
 }
 
+void UCodeRushGameInstance::SendProblemRequest()
+{
+	TSharedRef<IHttpRequest> Request = FHttpModule::Get().CreateRequest();
+	Request->SetURL("http://localhost:8080/api/problems/request");
+	Request->SetVerb("POST");
+	Request->SetHeader("Content-Type", "application/json");
+	Request->OnProcessRequestComplete().BindUObject(this, &UCodeRushGameInstance::OnProblemRequestResponse);
+	Request->ProcessRequest();
+}
+
+void UCodeRushGameInstance::OnProblemRequestResponse(FHttpRequestPtr Request, FHttpResponsePtr Response, bool bWasSuccessful)
+{
+	if (bWasSuccessful && Response->GetResponseCode() == 200)
+	{
+		TSharedPtr<FJsonObject> JsonObject;
+		TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Response->GetContentAsString());
+
+		if (FJsonSerializer::Deserialize(Reader, JsonObject) && JsonObject.IsValid())
+		{
+			ProblemRequestId = JsonObject->GetStringField("requestId");
+			UE_LOG(LogTemp, Log, TEXT("[ProblemRequest] Received requestId: %s"), *ProblemRequestId);
+
+			// 3초마다 polling
+			GetWorld()->GetTimerManager().SetTimer(PollingTimerHandle, this, &UCodeRushGameInstance::CheckProblemResult, 3.0f, true);
+		}
+	}
+	else
+	{
+		UE_LOG(LogTemp, Error, TEXT("[ProblemRequest] Failed to request problem set."));
+	}
+}
+
+void UCodeRushGameInstance::CheckProblemResult()
+{
+	FString URL = FString::Printf(TEXT("http://localhost:8080/api/problems/result/%s"), *ProblemRequestId);
+
+	TSharedRef<IHttpRequest> Request = FHttpModule::Get().CreateRequest();
+	Request->SetURL(URL);
+	Request->SetVerb("GET");
+	Request->SetHeader("Content-Type", "application/json");
+	Request->OnProcessRequestComplete().BindLambda([this](FHttpRequestPtr Req, FHttpResponsePtr Resp, bool bSuccess)
+		{
+			if (bSuccess && Resp->GetResponseCode() == 200)
+			{
+				UE_LOG(LogTemp, Log, TEXT("[CheckProblemResult] Problem set ready!"));
+				OnGetProblemSetResponse(Req, Resp, true);
+
+				GetWorld()->GetTimerManager().ClearTimer(PollingTimerHandle);
+			}
+			else if (bSuccess && Resp->GetResponseCode() == 204)
+			{
+				UE_LOG(LogTemp, Log, TEXT("[CheckProblemResult] Problem set not ready yet, polling continues..."));
+			}
+			else
+			{
+				UE_LOG(LogTemp, Error, TEXT("[CheckProblemResult] Failed to get problem result. Stop polling."));
+				GetWorld()->GetTimerManager().ClearTimer(PollingTimerHandle);
+			}
+		});
+	Request->ProcessRequest();
+}
+
 void UCodeRushGameInstance::OnGetProblemSetResponse(FHttpRequestPtr Request, FHttpResponsePtr Response, bool bWasSuccessful)
 {
-
 	if (!bWasSuccessful || !Response.IsValid())
 	{
-		if (!bWasSuccessful)
-		{
-			UE_LOG(LogTemp, Error, TEXT("[GetProblemSet] Request failed to send"));
-		}
-		else if (!Response.IsValid())
-		{
-			UE_LOG(LogTemp, Error, TEXT("[GetProblemSet] Response invalid"));
-		}
-
+		UE_LOG(LogTemp, Error, TEXT("[GetProblemSet] HTTP request failed"));
 		return;
 	}
-
-	FString ContentType = Response->GetHeader("Content-Type");
-	UE_LOG(LogTemp, Warning, TEXT("[GetProblemSet] Response Content-Type: %s"), *ContentType);
-
-	int32 StatusCode = Response->GetResponseCode();
-	UE_LOG(LogTemp, Warning, TEXT("[GetProblemSet] HTTP Response Code: %d"), StatusCode);
-
-	UE_LOG(LogTemp, Warning, TEXT("Response code: %d"), Response->GetResponseCode());
 
 	TArray<TSharedPtr<FJsonValue>> JsonArray;
 	TSharedRef<TJsonReader<>> Reader = TJsonReaderFactory<>::Create(Response->GetContentAsString());
 
-	UE_LOG(LogTemp, Log, TEXT("[GetProblemSet] Raw Response:\n%s"), *Response->GetContentAsString());
-
 	if (FJsonSerializer::Deserialize(Reader, JsonArray))
 	{
 		ProblemSet.Empty();
-		for (TSharedPtr<FJsonValue> Value : JsonArray)
+		for (auto& Value : JsonArray)
 		{
 			TSharedPtr<FJsonObject> Obj = Value->AsObject();
+			if (!Obj.IsValid()) continue;
+
 			FProblemDTO Problem;
-
-			// id (Null-safe 처리)
-			int32 TmpId;
-			if (Obj->HasField("id"))
-			{
-				FString IdString;
-				if (Obj->TryGetStringField("id", IdString))
-				{
-					Problem.id = FCString::Atoi(*IdString);
-				}
-				else if (Obj->TryGetNumberField("id", TmpId))
-				{
-					Problem.id = TmpId;
-				}
-				else
-				{
-					Problem.id = -1;
-				}
-			}
-			else
-			{
-				Problem.id = -1;
-			}
-
+			Problem.id = Obj->GetIntegerField("id");
 			Problem.category = Obj->GetStringField("category");
 			Problem.type = Obj->GetStringField("type");
 			Problem.title = Obj->GetStringField("title");
+			Problem.description = Obj->GetStringField("description");
 			Problem.answer = Obj->GetStringField("answer");
 
-			FString FullDescription = Obj->GetStringField("description");
-			Problem.description = FullDescription; // 우선 전체 저장
-
-			FString DescPart, CodePart;
-			if (FullDescription.Split(TEXT("코드:"), &DescPart, &CodePart))
-			{
-				Problem.description = DescPart.TrimStartAndEnd();
-				CodePart.TrimStartInline();
-				Problem.targetSnippet = CodePart; // 기본적으로 description에 있는 코드 사용
-			}
-
-
-			// JSON 필드 기반 targetSnippet이 존재할 경우만 덮어쓰기
 			FString TmpString;
-			if (Problem.targetSnippet.IsEmpty())
-			{
-				if (Obj->TryGetStringField("targetSnippet", TmpString))
-				{
-					Problem.targetSnippet = TmpString;
-				}
-			}
-
-			// correctFix
+			if (Obj->TryGetStringField("targetSnippet", TmpString))
+				Problem.targetSnippet = TmpString;
 			if (Obj->TryGetStringField("correctFix", TmpString))
-			{
 				Problem.correctFix = TmpString;
-			}
-			else
-			{
-				Problem.correctFix = TEXT("");
-			}
 
-			// Choices 파싱
-			Problem.choices.Empty();
 			const TArray<TSharedPtr<FJsonValue>>* ChoicesArray;
 			if (Obj->TryGetArrayField("choices", ChoicesArray))
 			{
-				for (auto ChoiceValue : *ChoicesArray)
+				for (const auto& ChoiceValue : *ChoicesArray)
 				{
 					Problem.choices.Add(ChoiceValue->AsString());
 				}
@@ -273,7 +267,11 @@ void UCodeRushGameInstance::OnGetProblemSetResponse(FHttpRequestPtr Request, FHt
 		}
 
 		UE_LOG(LogTemp, Log, TEXT("[GetProblemSet] Loaded %d problems"), ProblemSet.Num());
+		
 		CurrentProblemIndex = 0;
+		CorrectAnswerCount = 0;
+		IncorrectProblems.Empty();
+
 		OnProblemSetLoaded.Broadcast();
 	}
 	else

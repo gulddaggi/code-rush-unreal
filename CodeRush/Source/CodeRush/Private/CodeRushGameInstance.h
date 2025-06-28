@@ -85,7 +85,10 @@ public:
 	TArray<FProblemDTO> IncorrectProblems;
 
 	UPROPERTY(BlueprintReadWrite)
-	int32 CurrentProblemIndex;
+	int32 CurrentProblemIndex = 0;
+
+	UPROPERTY(BlueprintReadWrite)
+	int32 CorrectAnswerCount = 0;
 
 	UPROPERTY(BlueprintReadWrite)
 	EGamePhase CurrentPhase = EGamePhase::Title;
@@ -108,14 +111,22 @@ public:
 	UFUNCTION(BlueprintCallable)
 	void SetGamePhase(EGamePhase NewPhase);
 
-	UPROPERTY(BlueprintReadWrite)
-	int32 CorrectAnswerCount = 0;
-
 	UFUNCTION(BlueprintCallable)
 	void ResetGameState();
+
+	UFUNCTION(BlueprintCallable)
+	void SendProblemRequest();
+
+	UFUNCTION()
+	void CheckProblemResult();
 
 private:
 	void OnCreateUserResponse(FHttpRequestPtr Request, FHttpResponsePtr Response, bool bSuccess);
 	void OnGetProblemSetResponse(FHttpRequestPtr Request, FHttpResponsePtr Response, bool bSuccess);
 	void OnSubmitAnswerResponse(FHttpRequestPtr Request, FHttpResponsePtr Response, bool bWasSuccessful);
+	void OnProblemRequestResponse(FHttpRequestPtr Request, FHttpResponsePtr Response, bool bWasSuccessful);
+	
+	FString ProblemRequestId;
+	FTimerHandle PollingTimerHandle;
+
 };
